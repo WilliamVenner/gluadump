@@ -7,18 +7,22 @@
 -- at the bottom of lua/includes/init.lua and lua/includes/init_menu.lua
 -- then, open gmod, start a new game and select "2 Players"
 -- dumped files can be found in data/gluadump/
+-- recommended: -noworkshop -noaddons
+
+local function gluadump()
 
 local filter = {
 	["_PACKAGE"] = true,
 	["_NAME"] = true,
 	["_G"] = true,
 	["_M"] = true,
-	["packageloaded"] = true,
+	["package.loaded"] = true,
 	["SpawniconGenFunctions"] = true,
 	["_E"] = true,
 	["g_SBoxObjects"] = true,
 	["ComboBox_Emitter_Options"] = true,
 	["Morph"] = true,
+	["__index"] = true,
 }
 
 local gluadump = { metatables = {} }
@@ -37,7 +41,8 @@ MsgC(Color(255, 0, 255) , "[" .. realm .. "] gluadump started\n")
 local cyclic = {}
 local function dump(tbl, store, id)
 	for i, v in pairs(tbl) do
-		if filter[i] or filter[id..i] then continue end
+		if type(i) ~= "string" then continue end
+		if filter[i] or filter[id .. i] then continue end
 
 		local typeof = type(v)
 
@@ -50,17 +55,17 @@ local function dump(tbl, store, id)
 				def.value = { [realm] = { v.r, v.g, v.b, v.a or 255 } }
 			elseif not table.IsEmpty(v) then
 				if not cyclic[v] then
-					cyclic[v] = true
+					cyclic[v] = id .. i
 
 					def.members = {}
-					dump(v, def.members, id..i)
+					dump(v, def.members, id .. i .. ".")
 				else
-					def.cyclic = { [realm] = true }
+					def.cyclic = { [realm] = cyclic[v] }
 				end
 			end
 		elseif typeof == "function" then
 			local src = debug.getinfo(v, "S")
-			if src.short_src ~= "[C]" then
+			if src.short_src ~= "[C]" and (src.short_src ~= "lua/includes/util.lua" or ((src.linedefined ~= 182 or src.lastlinedefined ~= 182) and (src.linedefined ~= 196 or src.lastlinedefined ~= 196))) then -- HACK! filter out AccessorFunc
 				def.src = { [realm] = { src.short_src, src.linedefined, src.lastlinedefined } }
 			end
 		elseif typeof == "number" then
@@ -192,4 +197,17 @@ if file.Exists("gluadump/client.json", "DATA") and file.Exists("gluadump/server.
 	))))
 
 	MsgC(Color(0, 255, 0) , "gluadump complete\n")
+end
+
+end
+
+if CLIENT and not MENU_DLL then
+	hook.Add("Think", "gluadump", function()
+		if DListView then
+			hook.Remove("Think", "gluadump")
+			gluadump()
+		end
+	end)
+else
+	gluadump()
 end
