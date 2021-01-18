@@ -23,6 +23,9 @@ local filter = {
 	["ComboBox_Emitter_Options"] = true,
 	["Morph"] = true,
 	["__index"] = true,
+	["_LOADED"] = true,
+	["_PRELOAD"] = true,
+	["_LOADLIB"] = true,
 }
 
 local gluadump = { metatables = {} }
@@ -85,9 +88,9 @@ dump(_G, gluadump, "")
 
 local R = debug.getregistry()
 for i, v in pairs(R) do
-	if isstring(i) and istable(R[v]) then
+	if isstring(i) and istable(v) and not filter[i] then
 		gluadump.metatables[i] = {}
-		dump(R[v], gluadump.metatables[i])
+		dump(v, gluadump.metatables[i], "")
 	end
 end
 
